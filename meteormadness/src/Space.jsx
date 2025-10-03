@@ -1,7 +1,8 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Stars, useTexture } from "@react-three/drei";
 import { useNavigate } from "react-router-dom";
+import { fetchAsteroids } from "./nasa.js";
 
 function Earth() {
   const meshRef = useRef(null);
@@ -32,14 +33,14 @@ function Earth() {
   );
 }
 
-function Asteroid({ 
-  position, 
-  size = 0.3, 
-  texturePath, 
-  asteroidData, 
+function Asteroid({
+  position,
+  size = 0.3,
+  texturePath,
+  asteroidData,
   onAsteroidClick,
   isSelected,
-  onHover 
+  onHover,
 }) {
   const meshRef = useRef(null);
   const asteroidTexture = useTexture(texturePath);
@@ -50,12 +51,12 @@ function Asteroid({
       meshRef.current.rotation.x += 0.5 * delta;
       meshRef.current.rotation.y += 0.3 * delta;
 
-      // Stop orbital movement when hovered or selected
       if (!isHovered && !isSelected) {
-        const time = Date.now() * 0.001;
-        const orbitRadius = 3 + position * 0.5;
+        const time = Date.now() * 0.0001; // Slower orbit
+        const orbitRadius = 4 + position * 0.4;
         meshRef.current.position.x = Math.cos(time + position) * orbitRadius;
         meshRef.current.position.z = Math.sin(time + position) * orbitRadius;
+        meshRef.current.position.y = Math.sin(time + position) * 0.5; // Add some y-axis movement
       }
     }
   });
@@ -75,26 +76,29 @@ function Asteroid({
   };
 
   return (
-    <mesh 
-      ref={meshRef} 
+    <mesh
+      ref={meshRef}
       position={[0, 0, 0]}
       onClick={handleClick}
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
-      scale={isSelected ? 1.5 : (isHovered ? 1.2 : 1)}
+      scale={isSelected ? 1.5 : isHovered ? 1.2 : 1}
     >
       <sphereGeometry args={[size, 16, 16]} />
-      <meshStandardMaterial 
-        map={asteroidTexture} 
+      <meshStandardMaterial
+        map={asteroidTexture}
         roughness={0.8}
-        emissive={isSelected ? "#ff4444" : (isHovered ? "#ffaa00" : "#000000")}
-        emissiveIntensity={isSelected ? 0.3 : (isHovered ? 0.2 : 0)}
+        emissive={
+          isSelected ? "#ff4444" : isHovered ? "#ffaa00" : "#000000"
+        }
+        emissiveIntensity={isSelected ? 0.3 : isHovered ? 0.2 : 0}
       />
     </mesh>
   );
 }
 
 function AsteroidCard({ asteroid, onClose, onSimulate }) {
+    // ... This component's code remains unchanged from your original file
   const cardStyles = {
     position: "absolute",
     top: "50%",
@@ -319,6 +323,7 @@ function AsteroidCard({ asteroid, onClose, onSimulate }) {
 }
 
 function ControlButtons() {
+    // ... This component's code remains unchanged from your original file
   const [activeButton, setActiveButton] = useState(null);
   const navigate = useNavigate();
 
@@ -387,84 +392,95 @@ function ControlButtons() {
 }
 
 export default function Space() {
+  const [asteroids, setAsteroids] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedAsteroid, setSelectedAsteroid] = useState(null);
-  const [hoveredAsteroid, setHoveredAsteroid] = useState(null);
   const navigate = useNavigate();
 
-  const asteroids = [
-    {
-      id: 1,
-      position: 0,
-      size: 0.2,
-      texture: "/textures/asteroid1.jpg",
-      name: "Apophis",
-      diameter: 370,
-      velocity: 30,
-      distance: "0.1 AU",
-      riskLevel: "High",
-      riskColor: "#ff4444",
-      description: "A potentially hazardous asteroid that will make a close approach to Earth in 2029. Scientists are closely monitoring its trajectory for any changes."
-    },
-    {
-      id: 2,
-      position: 1.2,
-      size: 0.25,
-      texture: "/textures/asteroid2.jpg",
-      name: "Bennu",
-      diameter: 490,
-      velocity: 28,
-      distance: "0.3 AU",
-      riskLevel: "Medium",
-      riskColor: "#ffaa00",
-      description: "NASA's OSIRIS-REx mission target. This carbon-rich asteroid provides insights into the early solar system and potential resources."
-    },
-    {
-      id: 3,
-      position: 2.4,
-      size: 0.3,
-      texture: "/textures/asteroid3.jpg",
-      name: "Didymos",
-      diameter: 780,
-      velocity: 25,
-      distance: "0.5 AU",
-      riskLevel: "Low",
-      riskColor: "#44ff44",
-      description: "Binary asteroid system that was the target of NASA's DART mission to test asteroid deflection technology."
-    },
-    {
-      id: 4,
-      position: 3.6,
-      size: 0.2,
-      texture: "/textures/asteroid4.jpg",
-      name: "Ryugu",
-      diameter: 900,
-      velocity: 32,
-      distance: "0.8 AU",
-      riskLevel: "Very Low",
-      riskColor: "#44aaff",
-      description: "Diamond-shaped asteroid studied by Japan's Hayabusa2 mission. Rich in carbon and water-bearing minerals."
-    },
-    {
-      id: 5,
-      position: 4.8,
-      size: 0.35,
-      texture: "/textures/asteroid5.jpg",
-      name: "Vesta",
-      diameter: 525000,
-      velocity: 35,
-      distance: "1.5 AU",
-      riskLevel: "None",
-      riskColor: "#8888ff",
-      description: "One of the largest asteroids in the belt, Vesta is a protoplanet that provides clues about planetary formation."
-    },
+  const asteroidTextures = [
+    "/textures/asteroid1.jpg",
+    "/textures/asteroid2.jpg",
+    "/textures/asteroid3.jpg",
+    "/textures/asteroid4.jpg",
+    "/textures/asteroid5.jpg",
   ];
+
+  useEffect(() => {
+    const loadAsteroids = async () => {
+      try {
+        setLoading(true);
+        const rawAsteroids = await fetchAsteroids();
+
+        const formattedAsteroids = rawAsteroids.map((raw, index) => {
+          const closeApproach = raw.close_approach_data[0];
+          const diameterMeters =
+            (raw.estimated_diameter.meters.estimated_diameter_min +
+              raw.estimated_diameter.meters.estimated_diameter_max) /
+            2;
+
+          let riskLevel = "None";
+          let riskColor = "#8888ff";
+
+          if (raw.is_potentially_hazardous_asteroid) {
+            riskLevel = "Medium";
+            riskColor = "#ffaa00";
+            if (
+              diameterMeters > 500 &&
+              parseFloat(closeApproach.miss_distance.astronomical) < 0.05
+            ) {
+              riskLevel = "High";
+              riskColor = "#ff4444";
+            } else if (diameterMeters < 100) {
+              riskLevel = "Low";
+              riskColor = "#44ff44";
+            }
+          }
+
+          return {
+            id: raw.id,
+            position: index * 1.2,
+            size: 0.15 + Math.random() * 0.15,
+            texture: asteroidTextures[index % asteroidTextures.length],
+            name: raw.name.replace(/[()]/g, ""),
+            diameter: Math.round(diameterMeters),
+            velocity: Math.round(
+              parseFloat(closeApproach.relative_velocity.kilometers_per_second)
+            ),
+            distance: `${parseFloat(
+              closeApproach.miss_distance.astronomical
+            ).toFixed(3)} AU`,
+            riskLevel,
+            riskColor,
+            description: `This asteroid, known as ${
+              raw.name
+            }, is approximately ${Math.round(
+              diameterMeters
+            )} meters in diameter. Its closest approach to Earth is on ${
+              closeApproach.close_approach_date_full
+            }. It is${
+              raw.is_potentially_hazardous_asteroid ? "" : " not"
+            } considered potentially hazardous.`,
+          };
+        });
+
+        setAsteroids(formattedAsteroids);
+        setError(null);
+      } catch (err) {
+        setError(
+          "Could not fetch data from NASA. The demo key might be over its rate limit. Please add your own API key to the .env file and try again."
+        );
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAsteroids();
+  }, []);
 
   const handleAsteroidClick = (asteroid) => {
     setSelectedAsteroid(asteroid);
-  };
-
-  const handleAsteroidHover = (isHovered) => {
-    // This can be used for global hover state if needed
   };
 
   const handleCloseCard = () => {
@@ -473,14 +489,56 @@ export default function Space() {
 
   const handleSimulateImpact = () => {
     if (selectedAsteroid) {
-      navigate('/impact', { 
-        state: { 
+      navigate("/impact", {
+        state: {
           diameter: selectedAsteroid.diameter,
-          velocity: selectedAsteroid.velocity 
-        }
+          velocity: selectedAsteroid.velocity,
+        },
       });
     }
   };
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          width: "100vw",
+          height: "100vh",
+          background: "black",
+          color: "white",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontSize: "2rem",
+          fontFamily: "Arial, sans-serif",
+        }}
+      >
+        Loading Celestial Data...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        style={{
+          width: "100vw",
+          height: "100vh",
+          background: "black",
+          color: "red",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontSize: "1.5rem",
+          padding: "2rem",
+          textAlign: "center",
+          fontFamily: "Arial, sans-serif",
+        }}
+      >
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div style={{ position: "relative", width: "100vw", height: "100vh" }}>
@@ -509,14 +567,14 @@ export default function Space() {
             texturePath={asteroid.texture}
             asteroidData={asteroid}
             onAsteroidClick={handleAsteroidClick}
-            onHover={handleAsteroidHover}
+            onHover={() => {}}
             isSelected={selectedAsteroid?.id === asteroid.id}
           />
         ))}
 
         <OrbitControls />
       </Canvas>
-      
+
       <ControlButtons />
 
       {selectedAsteroid && (
