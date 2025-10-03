@@ -1,49 +1,24 @@
-import React, { useRef } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Stars } from "@react-three/drei";
-function Sphere() {
-  const meshRef = useRef(null);
-
-  useFrame((_, delta) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.x += 0.2 * delta;
-      meshRef.current.rotation.y += 0.2 * delta;
-      meshRef.current.position.y = Math.sin(Date.now() * 0.001) * 0.5;
-    }
-  });
-
-  return (
-    <mesh ref={meshRef}>
-      <sphereGeometry args={[1, 32, 32]} />
-      <meshStandardMaterial color="orange" />
-    </mesh>
-  );
-}
-
+import React from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Space from "./Space";
+import Track from "./Track";
+import Impact from "./Impact";
+import Registration from "./Registration";
+import AuthPage from "./Authentication";
+import { ClerkProvider } from "@clerk/clerk-react";
 export default function App() {
+  const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
   return (
- 
-      <Canvas
-        style={{ width: "100vw", height: "100vh", background: "black" }}
-        camera={{ position: [5, 5, 5], fov: 60 }}
-      >
-        <Stars
-          radius={100}
-          depth={50}
-          count={5000}
-          factor={4}
-          saturation={0}
-          fade
-        />
-        <ambientLight intensity={0.3} />
-        <pointLight position={[10, 10, 10]} intensity={1} />
-
-        <Sphere />
-
-        <OrbitControls />
-      </Canvas>
-      
-    
-
+    <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+      <Router>
+        <Routes>
+          <Route path="/" element={<AuthPage />} />
+          <Route path="/space" element={<Space />} />
+          <Route path="/track" element={<Track />} />
+          <Route path="/impact" element={<Impact />} />
+          <Route path="/registration" element={<Registration />} />
+        </Routes>
+      </Router>
+    </ClerkProvider>
   );
 }
