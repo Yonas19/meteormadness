@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, Suspense } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Stars, useTexture } from "@react-three/drei";
 import { useNavigate } from "react-router-dom";
@@ -557,20 +557,22 @@ export default function Space() {
         <ambientLight intensity={2.5} />
         <pointLight position={[10, 10, 10]} intensity={1} />
 
-        <Earth />
+        <Suspense fallback={null}>
+          <Earth />
 
-        {asteroids.map((asteroid) => (
-          <Asteroid
-            key={asteroid.id}
-            position={asteroid.position}
-            size={asteroid.size}
-            texturePath={asteroid.texture}
-            asteroidData={asteroid}
-            onAsteroidClick={handleAsteroidClick}
-            onHover={() => {}}
-            isSelected={selectedAsteroid?.id === asteroid.id}
-          />
-        ))}
+          {asteroids.map((asteroid) => (
+            <Asteroid
+              key={asteroid.id}
+              position={asteroid.position}
+              size={asteroid.size}
+              texturePath={asteroid.texture}
+              asteroidData={asteroid}
+              onAsteroidClick={handleAsteroidClick}
+              onHover={() => {}}
+              isSelected={selectedAsteroid?.id === asteroid.id}
+            />
+          ))}
+        </Suspense>
 
         <OrbitControls />
       </Canvas>
